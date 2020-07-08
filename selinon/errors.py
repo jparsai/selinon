@@ -148,3 +148,19 @@ class CacheMissError(SelinonException):
 
 class ConfigNotInitializedError(SelinonException):
     """An error raised when the configuration was requested, but not initialized."""
+
+
+class NotABugFatalTaskError(SelinonException):
+    """An exception that is raised by task on fatal error - task will be not retried."""
+
+    def __init__(self, state):
+        """Make sure flow errors capture final state of the flow.
+
+        :param state: final flow state
+        """
+        super().__init__(json.dumps(state))
+
+    @property
+    def state(self):
+        """Get structured flow state."""
+        return json.loads(str(self))
