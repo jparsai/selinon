@@ -188,6 +188,7 @@ class Dispatcher(Task):
         # Perform migrations at first place
         self.migrate_message(flow_info)
 
+        # Custom function to check if message is running in dispatcher for a long time
         self._check_hanged_task(flow_info)
 
         try:
@@ -243,11 +244,11 @@ class Dispatcher(Task):
             flow_start_time = datetime.strptime(node_args['flow_start_time'], '%Y-%m-%d %H:%M:%S.%f')
             current_time = datetime.now()
             time_diff = current_time - flow_start_time
-            no_of_hours = time_diff.days * 24 + time_diff.seconds // 3600
-            #no_of_minutes = (time_diff.seconds % 3600) // 60
+            #no_of_hours = time_diff.days * 24 + time_diff.seconds // 3600
+            no_of_hours = (time_diff.seconds % 3600) // 60
             node_args['no_of_hours']=no_of_hours
 
-            if no_of_hours >= 24:
+            if no_of_hours >= 10:
                 logger.info("Flow is running for {} Hours. It is being stopped forcefully."
                             .format(no_of_hours))
                 raise self.not_bug_fatal_task_error(flow_info['state'])
