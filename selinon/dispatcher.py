@@ -249,26 +249,12 @@ class Dispatcher(Task):
             node_args['no_of_hours']=no_of_hours
 
             if no_of_hours >= 10:
-                logger.info("Flow is running for {} Hours. It is being stopped forcefully."
-                            .format(no_of_hours))
-                raise self.not_bug_fatal_task_error(flow_info['state'])
+                error_message = "Flow is running for {} Hours. It is being stopped forcefully." \
+                                "\nFlow information: {}".format(no_of_hours, json.dumps(flow_info))
+                logger.info(error_message)
+                exc = NotABugFatalTaskError(error_message)
+                raise self.retry(max_retries=0, exc=exc)
         else:
             # If message is arrived for the first time, then put current time in node arguments
             # and consider it as starting time of the flow.
             node_args['flow_start_time'] = str(datetime.now())
-
-    def not_bug_fatal_task_error(self, state):
-        """An exception that is raised by task on fatal error - task will be not retried.
-
-        :param state: flow state that should be captured
-        :raises celery.exceptions.Retry: Celery's retry exception, always
-        """
-        logger.info("Raising NotABugFatalTaskError for: {}".format(json.dumps(state)))
-
-        reported_state = {
-            'finished_nodes': (state or {}).get('finished_nodes', {}),
-            'failed_nodes': (state or {}).get('failed_nodes', {}),
-            'active_nodes': (state or {}).get('active_nodes', [])
-        }
-        exc = NotABugFatalTaskError(reported_state)
-        raise self.retry(max_retries=0, exc=exc)
