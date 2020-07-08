@@ -249,10 +249,9 @@ class Dispatcher(Task):
             node_args['no_of_hours']=no_of_hours
 
             if no_of_hours >= 10:
-                error_message = "Flow is running for {} Hours. It is being stopped forcefully." \
-                                "\nFlow information: {}".format(no_of_hours, json.dumps(flow_info))
-                logger.info(error_message)
-                exc = NotABugFatalTaskError(error_message)
+                exc = NotABugFatalTaskError("Flow is running for {} Hours. "
+                                            "It is being stopped forcefully."
+                                            "\nFlow information: {}".format(no_of_hours, flow_info))
                 raise self.retry(max_retries=0, exc=exc)
         else:
             # If message is arrived for the first time, then put current time in node arguments
