@@ -15,11 +15,15 @@ from .errors import FlowError
 from .errors import MigrationException
 from .errors import MigrationFlowFail
 from .errors import MigrationFlowRetry
-from .errors import MigrationSkew
+from .errors import MigrationSkew, FatalTaskError, NotABugFatalTaskError
 from .migrations import Migrator
 from .system_state import SystemState
 from .trace import Trace
+from datetime import datetime
+import logging
+import json
 
+logger = logging.getLogger(__name__)
 
 class Dispatcher(Task):
     """Selinon Dispatcher worker implementation."""
@@ -183,6 +187,9 @@ class Dispatcher(Task):
         # Perform migrations at first place
         self.migrate_message(flow_info)
 
+        # Custom function to check if message is running in dispatcher for a long time
+        self._check_hung_task(flow_info)
+
         try:
             system_state = SystemState(self.request.id, flow_name, node_args, retry, state, parent, selective)
             retry = system_state.update()
@@ -225,3 +232,25 @@ class Dispatcher(Task):
             # Always an empty array.
             'active_nodes': state_dict.get('active_nodes', [])
         }
+
+    def _check_hung_task(self, flow_info):
+        """A custom function to remove tasks which are rotating in dispatcher for more than given time.
+       :param flow_info: information about the current flow
+       """
+        node_args = flow_info['node_args']
+        if node_args is not None and 'flow_start_time' in node_args and node_args['flow_start_time'] is not None:
+            flow_start_time = datetime.strptime(node_args['flow_start_time'], '%Y-%m-%d %H:%M:%S.%f')
+            current_time = datetime.now()
+            time_diff = current_time - flow_start_time
+            no_of_hours = time_diff.days * 24 + time_diff.seconds // 3600
+            node_args['no_of_hours'] = no_of_hours
+
+            if no_of_hours >= 24:
+                exc = NotABugFatalTaskError("Flow is running for {} Hours. "
+                                            "It is being stopped forcefully. "
+                                            "Flow information: {}".format(no_of_hours, flow_info))
+                raise self.retry(max_retries=0, exc=exc)
+        else:
+            # If message is arrived for the first time, then put current time in node arguments
+            # and consider it as starting time of the flow.
+            node_args['flow_start_time'] = str(datetime.now())
